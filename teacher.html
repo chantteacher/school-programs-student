@@ -133,7 +133,7 @@
 .dBanner{background:#fff6dd;border:1px solid #ecd9a0;color:#5a4710;border-radius:10px;padding:10px 12px;margin:0 0 10px;font-size:13px;line-height:1.55}
 .dBanner b{color:#3d2f00}.dBanner code{background:#fff;border:1px solid #ecd9a0;border-radius:5px;padding:0 5px;font-size:12.5px}
 .dBanner .dRow{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:6px}
-.dBanner .dSaved{font-size:12px;opacity:.8}
+.dBanner .dSaved{font-size:12px;opacity:.8;flex:1}
 .dAskOv{position:fixed;inset:0;background:rgba(20,28,45,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px}
 .dAsk{background:#fff;color:#1d2433;border-radius:14px;padding:18px;max-width:380px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}
 .dAsk p{margin:0 0 14px;font-size:15px;line-height:1.55;white-space:pre-line}
@@ -252,9 +252,9 @@ th, td { border-bottom-color:var(--line); }
 
 <!-- 앱 -->
 <div class="wrap" id="appView" hidden>
-<div class="dBanner"><b>🧪 체험판</b> · 샘플 행사와 학생 명단이 미리 들어 있어요. 무엇을 눌러도 실제 학교 데이터에는 닿지 않아요.
+<div class="dBanner"><b>🧪 체험판</b> · <span id="demoMode">샘플 행사와 학생 명단이 미리 들어 있어요. 무엇을 눌러도 실제 학교 데이터에는 닿지 않아요.</span>
  <div>교사 코드 <code>demo</code> · 관리자 비밀번호 <code>demo</code> (교사 로그인 창 아래 관리자 로그인)</div>
- <div class="dRow"><span class="dSaved" id="demoSaved">자동 저장됨</span><button class="btn" id="demoReset" type="button">처음부터 다시</button></div></div>
+ <div class="dRow"><span class="dSaved" id="demoSaved">자동 저장됨</span><a class="btn sm" id="studentLink" hidden target="_blank" rel="noopener">학생 화면 보기 ↗</a><button class="btn" id="demoReset" type="button">처음부터 다시</button></div></div>
   <header>
     <h1>우리 학교 행사 달력</h1>
     <div class="bar" style="margin:0">
@@ -426,6 +426,13 @@ th, td { border-bottom-color:var(--line); }
 <div id="toast"></div>
 
 <script>
+/* ===== 설정 ===== */
+// 체험용 Apps Script 웹앱 주소 (…/exec). 비워 두면 서버 없이 이 브라우저 안에서만 동작해요.
+const API_URL = 'https://script.google.com/macros/s/AKfycbyWAJuykK7hgqyYOdc4DsLIwY9zaU4XFVPLgMQXN3V8O_E8zHbuPs89twFnC2h33Q-Y/exec';
+// 학생용 체험판 주소 (선택: 넣으면 상단에 '학생 화면' 링크가 나타나요)
+const STUDENT_URL = '';
+/* ================ */
+const REMOTE = /^https:\/\/script\.google\.com\//.test(API_URL);
 
 const DB_KEY='site:event-demo-teacher:v1';
 const memStore={};
@@ -1032,7 +1039,7 @@ function buildIcs_() {
 return {verifyAdmin,login,getEvents,addEvent,addAcademic,deleteEvent,getRoster,saveRoster,submitFinal,adminData,exportToSheet};
 })();
 API.exportToSheet=function(){throw new Error('체험판에서는 구글시트 내보내기를 지원하지 않아요. 실제 사이트에서는 버튼 한 번으로 내 구글 드라이브에 시트가 만들어져요.');};
-function stamp(){const n=new Date(),z=x=>String(x).padStart(2,'0');const el=document.getElementById('demoSaved');if(el)el.textContent='자동 저장됨 · '+z(n.getHours())+':'+z(n.getMinutes());}
+function stamp(){const n=new Date(),z=x=>String(x).padStart(2,'0');const el=document.getElementById('demoSaved');if(el)el.textContent=(REMOTE?'체험 서버에 저장됨 · ':'자동 저장됨 · ')+z(n.getHours())+':'+z(n.getMinutes());}
 function persist(){saveDb();stamp();}
 function seed(){
   const A={adminPw:'demo'};
@@ -1044,14 +1051,20 @@ function seed(){
   const defs=[['학교 축제','학생부','한OO',-5,1,30,true],['체육대회','체육과','박OO',6,1,24,true],['독서 토론 한마당','국어과','이OO',9,2,12,false],['과학 탐구 대회','과학과','최OO',13,1,18,true],['진로 체험의 날','진로진학부','정OO',20,0,0,false],['수학 페스티벌','수학과','강OO',27,2,15,true]];
   defs.forEach(d=>{const id=API.addEvent({title:d[0],date:off(d[3]),dept:d[1],teacher:d[2]},A);if(d[5]){API.saveRoster(id,roster(d[4],d[5]),A);if(d[6])API.submitFinal(id,A);}});
 }
-if(!loadDb()){seed();}
-persist();
+if(!REMOTE){if(!loadDb()){seed();}persist();}
 window.__demoReset=function(){ldel(DB_KEY);['myEvents_v1','myEvents_v1_bak','deviceToken','profile_v3'].forEach(ldel);try{sessionStorage.removeItem('adminPw')}catch(e){}location.reload();};
+function remoteCall(name,args,ok,fail){
+  if(name==='exportToSheet'){setTimeout(function(){fail&&fail({message:'체험판에서는 구글시트 내보내기를 지원하지 않아요. 실제 사이트에서는 버튼 한 번으로 내 구글 드라이브에 시트가 만들어져요.'});},0);return;}
+  fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:name,args:args})})
+    .then(function(r){return r.json();})
+    .then(function(j){if(j&&j.ok){stamp();ok(j.result);}else if(fail)fail({message:(j&&j.error)||'서버 오류가 났어요.'});})
+    .catch(function(){if(fail)fail({message:'체험 서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.'});});
+}
 function makeRunner(){let ok=function(){},fail=null;
   const r=new Proxy({},{get:function(_,name){
     if(name==='withSuccessHandler')return function(f){ok=f;return r;};
     if(name==='withFailureHandler')return function(f){fail=f;return r;};
-    return function(){const args=[].slice.call(arguments);setTimeout(function(){
+    return function(){const args=[].slice.call(arguments);if(REMOTE){remoteCall(name,args,ok,fail);return;}setTimeout(function(){
       try{if(typeof API[name]!=='function')throw new Error('지원하지 않는 기능이에요: '+name);
         let res=API[name].apply(null,args);persist();ok(res===undefined?null:JSON.parse(JSON.stringify(res)));}
       catch(e){if(fail)fail({message:e.message});}},120);};}});
@@ -1071,7 +1084,7 @@ function ask(msg,yes,opts){opts=opts||{};
   row.appendChild(no);row.appendChild(ye);bx.appendChild(row);ov.appendChild(bx);document.body.appendChild(ov);ye.focus();}
 
 const APP_URL = location.href;
-const INIT_EVENTS = API.getEvents({});
+const INIT_EVENTS = REMOTE ? [] : API.getEvents({});
 const KEY = 'myEvents_v1';
 const DOW = ['일','월','화','수','목','금','토'];
 const REFRESH_MS = 10 * 60 * 1000;
@@ -1163,7 +1176,7 @@ function showApp() {
   $('fDept').value = profile ? profile.dept : ''; $('fTeacher').value = profile ? profile.name : '';
   setTab('Cal');
   render();
-  if (li) refresh();
+  if (li || REMOTE) refresh();
   clearInterval(refreshTimer);
   refreshTimer = setInterval(() => { if (!document.hidden) refresh(); }, REFRESH_MS);
 }
@@ -1719,7 +1732,19 @@ try { if (navigator.storage && navigator.storage.persist) navigator.storage.pers
   showApp();
 })();
 
-document.getElementById('demoReset').onclick = () => ask('체험 중 입력한 내용을 모두 지우고 샘플 상태로 되돌릴까요?', () => window.__demoReset());
+if (REMOTE) {
+  $('demoMode').textContent = '체험 서버에 연결돼 있어요. 여기서 등록한 행사는 학생 화면에도 바로 나타나고, 다른 체험자도 함께 봐요. 실제 학교 데이터와는 분리돼 있고, 매일 새벽 3시에 샘플 상태로 돌아가요.';
+  $('demoSaved').textContent = '체험 서버 연결됨';
+}
+if (STUDENT_URL) { $('studentLink').href = STUDENT_URL; $('studentLink').hidden = false; }
+document.getElementById('demoReset').onclick = () => {
+  if (!REMOTE) { ask('체험 중 입력한 내용을 모두 지우고 샘플 상태로 되돌릴까요?', () => window.__demoReset()); return; }
+  if (adminPw) {
+    ask('체험 서버의 행사와 명단을 모두 지우고 샘플 상태로 되돌릴까요?\n다른 체험자 화면에도 똑같이 적용돼요.', () => run('resetDemo', [ctx()], () => { refresh(true); if (!$('secAdmin').hidden) loadAdmin(); toast('샘플 상태로 되돌렸어요.'); }), { yesLabel: '초기화' });
+    return;
+  }
+  ask('이 기기의 로그인 정보와 내 일정을 지울까요?\n공유된 행사 데이터는 관리자(비밀번호 demo)로 로그인하면 초기화할 수 있고, 매일 새벽 3시에도 자동으로 초기화돼요.', () => window.__demoReset(), { yesLabel: '지우기' });
+};
 </script>
 <footer class="chant-footer">
   <p>© 2026 만든사람: <a href="https://www.instagram.com/chantteacher_math/" target="_blank" rel="noopener noreferrer">찬T</a> / 링크 공유 OK / 무단 복제·배포 금지</p>

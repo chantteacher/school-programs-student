@@ -186,11 +186,11 @@ th, td { border-bottom-color:var(--line); }
 </head>
 <body>
 <div class="wrap">
-<div class="dBanner"><b>🧪 체험판</b> · 샘플 행사와 학사일정이 들어 있어요. 아래 <b>내 일정 추가</b>로 넣은 일정은 이 브라우저에만 저장돼요.
+<div class="dBanner"><b>🧪 체험판</b> · <span id="demoMode">샘플 행사와 학사일정이 들어 있어요.</span> 아래 <b>내 일정 추가</b>로 넣은 일정은 이 브라우저에만 저장돼요.
  <div class="dRow"><span class="dSaved">내 일정: 이 기기·브라우저에 자동 저장</span><button class="btn" id="demoReset" type="button">처음부터 다시</button></div></div>
   <header>
     <h1>우리 학교 행사 달력</h1>
-    <a class="btn sm" id="teacherLink" hidden target="_blank" rel="noopener">교사 로그인</a>
+    <a class="btn sm" id="teacherLink" hidden target="_blank" rel="noopener">교사 화면 보기 ↗</a>
   </header>
 
   <div class="card">
@@ -258,12 +258,13 @@ th, td { border-bottom-color:var(--line); }
 
 <script>
 /* ===== 설정 ===== */
-// 행사 목록 파일 (같은 저장소에 두면 그대로 events.json)
-const EVENTS_URL = 'events.json';
-// 교사용 Apps Script 웹앱 주소 (선택: 넣으면 '교사 로그인' 링크와 캘린더 구독 주소가 나타남)
+// 체험용 Apps Script 웹앱 주소 (…/exec). 비워 두면 파일 안의 샘플 일정만 보여 줘요.
+const API_URL = 'https://script.google.com/macros/s/AKfycbyWAJuykK7hgqyYOdc4DsLIwY9zaU4XFVPLgMQXN3V8O_E8zHbuPs89twFnC2h33Q-Y/exec';
+// 교사용 체험판 주소 (선택: 넣으면 상단에 '교사 화면' 링크가 나타나요)
 const TEACHER_URL = '';
 /* ================ */
 
+const REMOTE = /^https:\/\/script\.google\.com\//.test(API_URL);
 const KEY = 'myEvents_v1';
 const CACHE_KEY = 'eventsCache_v1';
 const DOW = ['일','월','화','수','목','금','토'];
@@ -398,15 +399,31 @@ function demoEvents() {
   return [['학교 축제','학생부',-5,''],['중간고사 시작','',-9,'academic'],['학부모 상담 주간','',4,'academic'],['체육대회','체육과',6,''],['독서 토론 한마당','국어과',9,''],['과학 탐구 대회','과학과',13,''],['개교기념일','',14,'academic'],['진로 체험의 날','진로진학부',20,''],['수학 페스티벌','수학과',27,''],['기말고사 시작','',37,'academic'],['방학식','',55,'academic']]
     .map((a, i) => ({ id: 'demo' + i, title: a[0], date: off(a[2]), dept: a[1] || '학사일정', kind: a[3] }));
 }
+function hhmm(d) { return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
 function refresh(manual) {
   const info = $('syncInfo');
+  if (!REMOTE) {
+    official = demoEvents(); lastLoad = Date.now(); render();
+    info.textContent = '체험판 샘플 · ' + hhmm(new Date());
+    if (manual) toast('샘플 일정을 새로 불러왔어요.');
+    return;
+  }
   if (manual) info.textContent = '불러오는 중…';
-  official = demoEvents();
-  lastLoad = Date.now(); render();
-  const n = new Date();
-  info.textContent = '체험판 샘플 · ' + String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
-  if (manual) toast('샘플 일정을 새로 불러왔어요.');
+  fetch(API_URL + '?format=json&t=' + Math.floor(Date.now() / 60000))
+    .then(r => r.json())
+    .then(j => {
+      if (!j || !Array.isArray(j.events)) throw new Error('bad');
+      official = j.events; lastLoad = Date.now(); render();
+      lsSet(CACHE_KEY, JSON.stringify({ events: official, at: Date.now() }));
+      info.textContent = '최근 동기화 ' + hhmm(new Date());
+      if (manual) toast('학교 행사를 새로 불러왔어요.');
+    })
+    .catch(() => {
+      info.textContent = official.length ? '연결 안 됨 · 마지막으로 받은 일정 표시 중' : '연결 안 됨';
+      if (manual) toast('행사 목록을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.');
+    });
 }
+
 $('refreshBtn').onclick = () => refresh(true);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastLoad > 120000) refresh(); });
 setInterval(() => { if (!document.hidden) refresh(); }, REFRESH_MS);
@@ -453,7 +470,9 @@ $('bkFile').onchange = function () {
 };
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
 
-// 교사 링크·캘린더 연동: 체험판에서는 비활성화 (카드만 보임)
+// 캘린더 연동: 체험판에서는 비활성화 (카드만 보임)
+if (TEACHER_URL) { $('teacherLink').href = TEACHER_URL; $('teacherLink').hidden = false; }
+if (REMOTE) $('demoMode').textContent = '선생님 체험판에서 등록한 행사가 여기에 바로 나타나요 (새로고침).';
 render();
 refresh();
 
