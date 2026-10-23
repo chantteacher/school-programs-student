@@ -205,6 +205,10 @@ th, td { border-bottom-color:var(--line); }
 .dPrev th { background:var(--soft); }
 .chant-footer { border-top-color:var(--line); color:var(--sub); }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; scroll-behavior:auto !important; } }
+
+.card.off { opacity:.6; }
+.card.off h2::after { content:"준비 중"; margin-left:8px; font-size:11px; font-weight:600; padding:2px 7px; border-radius:6px; background:var(--soft); color:var(--sub); border:1px solid var(--line2); vertical-align:2px; }
+.card.off input, .card.off .btn { cursor:not-allowed; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -315,13 +319,14 @@ th, td { border-bottom-color:var(--line); }
       </form></div>
     </div>
 
-    <div class="card">
+    <div class="card off" id="icsCard" aria-disabled="true">
       <h2>내 캘린더 앱에 행사 연동</h2>
       <div class="small" style="margin-bottom:6px">아래 주소를 구글 캘린더(다른 캘린더 추가 → URL로 추가)나 아이폰 캘린더(구독 캘린더 추가)에 넣으면 공유 행사(날짜·행사명·주관부서)가 자동으로 들어와요. 내 일정은 포함되지 않아요.</div>
       <div class="sub-url">
-        <input id="icsUrl" readonly>
-        <button class="btn" id="copyBtn">복사</button>
+        <input id="icsUrl" readonly disabled placeholder="체험판에서는 캘린더 연동 주소가 나오지 않아요">
+        <button class="btn" id="copyBtn" disabled>복사</button>
       </div>
+      <div class="small" style="margin-top:6px">🔒 체험판에서는 아직 사용할 수 없어요. 실제 사이트에서는 이 주소를 캘린더 앱에 넣으면 학교 행사가 자동으로 들어와요.</div>
     </div>
     <div class="card fold" id="backupCard">
       <button type="button" class="fold-hd" aria-expanded="false"><span>내 일정 백업</span><span class="arrow">▾</span></button>
@@ -1358,13 +1363,7 @@ $('prev').onclick = () => { cur = new Date(cur.getFullYear(), cur.getMonth()-1, 
 $('next').onclick = () => { cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1); render(); };
 $('todayBtn').onclick = () => { const n = new Date(); cur = new Date(n.getFullYear(), n.getMonth(), 1); selected = ymd(n); $('fDate').value = selected; render(); };
 
-const icsUrl = APP_URL + '?format=ics';
-$('icsUrl').value = icsUrl;
-$('copyBtn').onclick = () => {
-  $('icsUrl').select();
-  try { navigator.clipboard.writeText(icsUrl).then(() => toast('복사했어요.'), () => { document.execCommand('copy'); toast('복사했어요.'); }); }
-  catch (e) { document.execCommand('copy'); toast('복사했어요.'); }
-};
+// 캘린더 연동: 체험판에서는 비활성화 (보이기만 함)
 DOW.forEach(d => $('dows').appendChild(h('div', {class:'dow'}, d)));
 $('fDate').value = selected;
 
